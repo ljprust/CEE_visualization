@@ -1,5 +1,4 @@
 from __main__ import *
-
 import yt
 import matplotlib.pyplot as pl
 import matplotlib.animation as animation
