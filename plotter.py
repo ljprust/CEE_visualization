@@ -11,6 +11,7 @@ parser.add_argument('--mass', action='store_true')
 parser.add_argument('--no_latex', action='store_true')
 parser.add_argument('--nplots', nargs=1, type=int)
 parser.add_argument('--py2', action='store_true')
+parser.add_argument('--energy', action='store_true')
 args = parser.parse_args()
 
 if (args.nplots != None) :
@@ -23,6 +24,10 @@ if (not args.no_latex) :
 	matplotlib.rc("text", usetex=True)
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
+
+def savePlot(fig,name):
+    fig.savefig(name)
+    print('Saved plot ' + name)
 
 def getPaths(nplots,py2):
 	paths = []
@@ -224,6 +229,7 @@ def plotSmoothSep( nplots, labels, time, sep ):
 	plt.ylabel(r'Smoothed Separation ($R_{\odot}$)', fontsize=25 )
 	# plt.axis([0.,240.,0.,53.])
 	plt.axis([0.,240.,2.,53.])
+	plt.hlines( 3., 0., 300. )
 	plt.yscale('log')
 	plt.xticks( fontsize=20)
 	plt.yticks( fontsize=20)
@@ -248,6 +254,7 @@ posCMy, posCMz, posPrimx, posPrimy, posPrimz, posCompx, posCompy, posCompz ):
 		plt.ylabel(r'Separation ($R_{\odot}$)', fontsize=25 )
 		# plt.axis([0.,240.,0.,53.])
 		plt.axis([0.,240.,2.,53.])
+		plt.hlines( 3., 0., 300. )
 		plt.yscale('log')
 		plt.xticks( fontsize=20)
 		plt.yticks( fontsize=20)
@@ -279,6 +286,8 @@ posCMy, posCMz, posPrimx, posPrimy, posPrimz, posCompx, posCompy, posCompz ):
 		plt.ylabel(r'separation ($R_{\odot}$)', fontsize=20 )
 		plt.xticks( fontsize=20)
 		plt.yticks( fontsize=20)
+		plt.axis([0.,240.,0.,10.])
+		plt.hlines( 3., 0., 300. )
 		plt.grid(True)
 		plt.title('Separation', fontsize=20)
 
@@ -384,13 +393,66 @@ def findAE( sep ):
     print('done')
     return a, ecc, boolArray
 
+def plotEnergy( time, ietot, ie_idealtot, gasKEtot, gasPEtot, DMKEtot, DMPEtot, nplots, labels ):
+	fig = plt.figure()
+	for i in range(0,nplots):
+		G = 6.674e-8
+		ietot = np.multiply(ietot,G)
+		ie_idealtot = np.multiply(ie_idealtot,G)
+		gasKEtot = np.multiply(gasKEtot,G)
+		gasPEtot = np.multiply(gasPEtot,G)
+		DMKEtot = np.multiply(DMKEtot,G)
+		DMPEtot = np.multiply(DMPEtot,G)
+
+		KEtot = gasKEtot[i] + DMKEtot[i]
+		PEtot = gasPEtot[i] + DMPEtot[i]
+		Etot = ietot[i] + KEtot[i] + PEtot[i]
+		Etot_ideal = ie_idealtot[i] + KEtot + PEtot
+		gasEtot = ietot[i] + gasKEtot[i] + gasPEtot[i]
+		gasEtot_ideal = ie_idealtot[i] + gasKEtot[i] + gasPEtot[i]
+		DMEtot = DMKEtot[i] + DMPEtot[i]
+
+		# plt.plot(time[i], ietot[i], c='r', linestyle='-', label='ie', lw=2)
+		# plt.plot(time[i], ie_idealtot[i], c='r', linestyle='--', label='ie ideal', lw=2)
+		# plt.plot(time[i], KEtot, c='b', label='KE tot', lw=2)
+		# plt.plot(time[i], DMKEtot[i], c='b', linestyle=':', label='KE DM', lw=2)
+		# plt.plot(time[i], gasKEtot[i], c='b', linestyle='--', label='KE Gas', lw=2)
+		# plt.plot(time[i], PEtot, c='g', label='PE tot', lw=2)
+		# plt.plot(time[i], gasPEtot[i], c='g', linestyle='--', label='PE Gas', lw=2)
+		# plt.plot(time[i], DMPEtot[i], c='g', linestyle=':', label='PE DM', lw=2)
+		# plt.plot(time[i], Etot, c='k', linestyle='-', label='E tot', lw=2)
+		# plt.plot(time[i], Etot_ideal, c='k', linestyle='--', label='E tot ideal', lw=2)
+		# plt.plot(time[i], gasEtot, c='y', linestyle='-', label = 'Gas tot', lw=2)
+		# plt.plot(time[i], gasEtot_ideal, c='y', linestyle='--', label = 'Gas tot ideal', lw=2)
+		# plt.plot(time[i], DMEtot, c='m', linestyle='-', label = 'DM tot', lw=2)
+
+		plt.plot(time[i], gasPEtot[i], c='r', linestyle='-', label='PE Gas', lw=2)
+		plt.plot(time[i], gasKEtot[i], c='r', linestyle=':', label='KE Gas', lw=2)
+		plt.plot(time[i], DMPEtot[i], c='b', linestyle='-', label='PE DM', lw=2)
+		plt.plot(time[i], DMKEtot[i], c='b', linestyle=':', label='KE DM', lw=2)
+		plt.plot(time[i], DMEtot, c='g', linestyle='-', label='Tot DM', lw=2)
+		plt.hlines( 0., 0., 300. )
+
+	plt.axis([0.,240.,-1.2e48,0.3e48])
+
+	plt.legend()
+	plt.yscale('linear')
+	plt.xlabel('Time (days)', fontsize=25 )
+	plt.ylabel('Mechanical Energy (ergs)', fontsize=25 )
+	plt.xticks( fontsize=20)
+	plt.yticks( fontsize=20)
+	plt.tight_layout()
+
+	savePlot(fig,'energies.pdf')
+	plt.clf()
+
 paths, labels = getPaths(nplots,args.py2)
 setnums, time, posCMx, posCMy, posCMz, vCMx, vCMy, vCMz, fracunbound, fracunbound_i, \
 sep, velCMnorm, posPrimx, posPrimy, posPrimz, posCompx, posCompy, \
 posCompz, massGasTot, ejeceff, ejeceff_i, ietot, ie_idealtot, gasKEtot, gasPEtot, DMKEtot, DMPEtot = collectData(nplots,paths)
 
 if args.unbound :
-    plotUnbound( time, fracunbound, ejeceff, nplots, labels )
+	plotUnbound( time, fracunbound, ejeceff, nplots, labels )
 	plotUnbound_i( time, fracunbound_i, ejeceff_i, nplots, labels )
 if args.mass :
     plotMass( time, massGasTot, nplots, labels )
@@ -407,3 +469,5 @@ if args.orbel :
 	plotOrbEl( nplots, labels, time, sep, a, ecc, boolArray, velCMnorm, posCMx, \
 	posCMy, posCMz, posPrimx, posPrimy, posPrimz, posCompx, posCompy, posCompz )
 	plotSmoothSep( nplots, labels, time, sep )
+if args.energy :
+	plotEnergy( time, ietot, ie_idealtot, gasKEtot, gasPEtot, DMKEtot, DMPEtot, nplots, labels )
