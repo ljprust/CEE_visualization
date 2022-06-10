@@ -17,6 +17,7 @@ args = parser.parse_args()
 
 movingBC = True
 G = 6.674e-8
+Rsun = 7.0e10
 colors = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9476bd','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf']
 
 if (args.nplots != None) :
@@ -272,9 +273,9 @@ def collectData(nplots,paths):
 		dynFricNoCorr.append(dynFricNoCorrN)
 		mPrim.append(mPrimN)
 		mComp.append(mCompN)
-		gravPrimGasX.append(gravPrimXN)
-		gravPrimGasY.append(gravPrimYN)
-		gravPrimGasZ.append(gravPrimZN)
+		gravPrimGasX.append(gravPrimGasXN)
+		gravPrimGasY.append(gravPrimGasYN)
+		gravPrimGasZ.append(gravPrimGasZN)
 
 	return setnums, time, posCMx, posCMy, posCMz, vCMx, vCMy, vCMz, fracunbound, fracunbound_i, \
 	sep, velCMnorm, posPrimx, posPrimy, posPrimz, posCompx, posCompy, \
@@ -411,47 +412,150 @@ def plotMomentum( time, Emech, gasPbound, gasPunbound, gasPxbound, gasPybound, g
 	savePlot(fig,'angmomentum.pdf')
 	plt.clf()
 
-def plotTorques( time, sep, posPrimx, posPrimy, posPrimz, posCompx, posCompy, posCompz, mPrim, mComp, mirrorForceX, mirrorForceY, mirrorForceZ, mirrorGravX, mirrorGravY, mirrorGravZ, mirrorGravCorrX, mirrorGravCorrY, mirrorGravCorrZ, gravPrimGasX, gravPrimGasY, gravPrimGasZ, dynFric, dynFricV, dynFricNoCorr, corePx, corePy, corePz, compPx, compPy, compPz, nplots, labels )
+def plotL( time, posPrimx, posPrimy, posPrimz, posCompx, posCompy, posCompz, mPrim, mComp, corePx, corePy, corePz, compPx, compPy, compPz, nplots, labels ) :
 
 	fig = plt.figure()
-	if nplots == 1 :
-		i=0
+	for i in range(0,nplots):
 		posPrim = np.array([posPrimx[i], posPrimy[i], posPrimz[i]])
 		posComp = np.array([posCompx[i], posCompy[i], posCompz[i]])
 		posCMDM = (mPrim[i]*posPrim+mComp[i]*posComp)/(mPrim[i]+mComp[i])
 		vPrim = np.array([corePx[i]/mPrim[i],corePy[i]/mPrim[i],corePz[i]/mPrim[i]])
 		vComp = np.array([compPx[i]/mComp[i],compPy[i]/mComp[i],compPz[i]/mComp[i]])
 		velCMDM = (mPrim[i]*vPrim+mComp[i]*vComp)/(mPrim[i]+mComp[i])
-		forceCoreCore = mPrim[i]*mComp[i]/sep[i]/sep[i]/sep[i]/Rsun/Rsun/Rsun*(posPrim-posComp)
-		hydroForce = np.array([mirrorForceX[i],mirrorForceY[i],mirrorForceZ[i]])
-		gravForceComp = np.array([mirrorGravX[i],mirrorGravY[i],mirrorGravZ[i]])
-		gravForcePrim = np.array([gravPrimGasX[i],gravPrimGasY[i],gravPrimGasZ[i]]) - forceCoreCore
 
-		gravTorquePrim = np.cross(posPrim,gravForcePrim)
-		gravTorqueComp = np.cross(posComp,gravForceComp)
-		hydroTorque = np.cross(posComp,hydroForce)
-		totalTorque = gravTorquePrim + gravTorqueComp + hydroTorque
+		Lprim = np.zeros(np.shape(posPrim))
+		Lcomp = np.zeros(np.shape(posPrim))
+		LprimPlane = np.zeros(len(posPrimx[i]))
+		LcompPlane = np.zeros(len(posPrimx[i]))
+		LtotPlane = np.zeros(len(posPrimx[i]))
 
-		gravTorquePrimCMDM = np.cross(posPrim-posCMDM,gravForcePrim)
-		gravTorqueCompCMDM = np.cross(posComp-posCMDM,gravForceComp)
-		hydroTorqueCMDM = np.cross(posComp-posCMDM,hydroForce)
-		totalTorqueCMDM = gravTorquePrimCMDM + gravTorqueCompCMDM + hydroTorqueCMDM
+		for j in range(0, len(posPrimx[i]) ) :
+			Lprim[:,j] = mPrim[i][j]*np.cross( posPrim[:,j]-posCMDM[:,j], vPrim[:,j]-velCMDM[:,j] )
+			Lcomp[:,j] = mComp[i][j]*np.cross( posComp[:,j]-posCMDM[:,j], vComp[:,j]-velCMDM[:,j] )
 
-		accelCMDM = (hydroForce+gravForceComp+gravForcePrim)/(mPrim[i]+mComp[i])
+			vRel = vComp[:,j] - vPrim[:,j]
+			vRelUnit = vRel / np.linalg.norm(vRel)
+			rRelUnit = (posComp[:,j]-posPrim[:,j])/np.linalg.norm(posComp[:,j]-posPrim[:,j])
+			nplane = np.cross(rRelUnit,vRelUnit)
+			nplane = nplane / np.linalg.norm(nplane)
 
-		gravTorquePrimCMDMaccel = np.cross(posPrim-posCMDM,gravForcePrim-mPrim[i]*accelCMDM)
-		gravTorqueCompCMDMaccel = np.cross(posComp-posCMDM,gravForceComp-mComp[i]*accelCMDM)
-		hydroTorqueCMDMaccel = np.cross(posComp-posCMDM,hydroForce)
-		totalTorqueCMDMaccel = gravTorquePrimCMDMaccel + gravTorqueCompCMDMaccel + hydroTorqueCMDMaccel
+			LprimPlane[j] = np.dot(Lprim[:,j],nplane)
+			LcompPlane[j] = np.dot(Lcomp[:,j],nplane)
+			LtotPlane[j] = LprimPlane[j] + LcompPlane[j]
 
-		plt.plot( time[i], totalTorque*G, c=colors[i], lw=2, linestyle='-', label='Lab Frame' )
-		plt.plot( time[i], totalTorqueCMDM*G, c=colors[i], lw=2, linestyle='--', label='CM Inertial' )
-		plt.plot( time[i], totalTorqueCMDMaccel*G, c=colors[i], lw=2, linestyle=':', label='CM Non-Inertial' )
+		plt.plot( time[i], LtotPlane*np.sqrt(G), c=colors[i], lw=2, linestyle='-', label=labels[i] )
 	if nplots > 1 :
-		plt.legend()
+		plt.legend(prop={'size': 15})
 	plt.xlabel(r'$t~/~{\rm d}$', fontsize=25 )
-	plt.ylabel('Torque (dyn-cm)', fontsize=25 )
-	# plt.axis([0.,40.,-5.0e34,6.0e34])
+	plt.ylabel(r'$L~/~{\rm g~cm^{2}~s^{-1}}$', fontsize=25 )
+	plt.axis([10.,40.,0.5e52,1.5e52])
+	plt.xticks( fontsize=20)
+	plt.yticks( fontsize=20)
+	plt.grid(True)
+	plt.tight_layout()
+	# saveas = writepath + 'unbound_' + simname + '.pdf'
+	savePlot(fig,'L.pdf')
+	plt.clf()
+
+def plotTorques( time, sep, posPrimx, posPrimy, posPrimz, posCompx, posCompy, posCompz, mPrim, mComp, mirrorForceX, mirrorForceY, mirrorForceZ, mirrorGravX, mirrorGravY, mirrorGravZ, mirrorGravCorrX, mirrorGravCorrY, mirrorGravCorrZ, gravPrimGasX, gravPrimGasY, gravPrimGasZ, dynFric, dynFricV, dynFricNoCorr, corePx, corePy, corePz, compPx, compPy, compPz, nplots, labels ) :
+
+	fig = plt.figure()
+	i=0
+	posPrim = np.array([posPrimx[i], posPrimy[i], posPrimz[i]])
+	posComp = np.array([posCompx[i], posCompy[i], posCompz[i]])
+	posCMDM = (mPrim[i]*posPrim+mComp[i]*posComp)/(mPrim[i]+mComp[i])
+	vPrim = np.array([corePx[i]/mPrim[i],corePy[i]/mPrim[i],corePz[i]/mPrim[i]])
+	vComp = np.array([compPx[i]/mComp[i],compPy[i]/mComp[i],compPz[i]/mComp[i]])
+	velCMDM = (mPrim[i]*vPrim+mComp[i]*vComp)/(mPrim[i]+mComp[i])
+	forceCoreCore = mPrim[i]*mComp[i]/sep[i]/sep[i]/sep[i]/Rsun/Rsun/Rsun*(posPrim-posComp)
+	hydroForce = np.array([mirrorForceX[i],mirrorForceY[i],mirrorForceZ[i]])
+	gravForceComp = np.array([mirrorGravX[i],mirrorGravY[i],mirrorGravZ[i]]) * mComp[i]
+	gravForcePrim = np.array([gravPrimGasX[i],gravPrimGasY[i],gravPrimGasZ[i]]) - forceCoreCore
+
+	accelCMDM = (hydroForce+gravForceComp+gravForcePrim)/(mPrim[i]+mComp[i])
+
+	gravTorquePrim = np.zeros(np.shape(posPrim))
+	gravTorqueComp = np.zeros(np.shape(posPrim))
+	hydroTorque = np.zeros(np.shape(posPrim))
+	totalTorque = np.zeros(np.shape(posPrim))
+	gravTorquePrimCMDM = np.zeros(np.shape(posPrim))
+	gravTorqueCompCMDM = np.zeros(np.shape(posPrim))
+	hydroTorqueCMDM = np.zeros(np.shape(posPrim))
+	totalTorqueCMDM = np.zeros(np.shape(posPrim))
+	gravTorquePrimCMDMaccel = np.zeros(np.shape(posPrim))
+	gravTorqueCompCMDMaccel = np.zeros(np.shape(posPrim))
+	hydroTorqueCMDMaccel = np.zeros(np.shape(posPrim))
+	totalTorqueCMDMaccel = np.zeros(np.shape(posPrim))
+	gravTorqueRel = np.zeros(np.shape(posPrim))
+	hydroTorqueRel = np.zeros(np.shape(posPrim))
+	totalTorqueRel = np.zeros(np.shape(posPrim))
+
+	gravTorquePrimPlane = np.zeros(len(posPrimx[i]))
+	gravTorqueCompPlane = np.zeros(len(posPrimx[i]))
+	hydroTorquePlane = np.zeros(len(posPrimx[i]))
+	totalTorquePlane = np.zeros(len(posPrimx[i]))
+	gravTorquePrimCMDMPlane = np.zeros(len(posPrimx[i]))
+	gravTorqueCompCMDMPlane = np.zeros(len(posPrimx[i]))
+	hydroTorqueCMDMPlane = np.zeros(len(posPrimx[i]))
+	totalTorqueCMDMPlane = np.zeros(len(posPrimx[i]))
+	gravTorquePrimCMDMaccelPlane = np.zeros(len(posPrimx[i]))
+	gravTorqueCompCMDMaccelPlane = np.zeros(len(posPrimx[i]))
+	hydroTorqueCMDMaccelPlane = np.zeros(len(posPrimx[i]))
+	totalTorqueCMDMaccelPlane = np.zeros(len(posPrimx[i]))
+	gravTorqueRelPlane = np.zeros(len(posPrimx[i]))
+	hydroTorqueRelPlane = np.zeros(len(posPrimx[i]))
+	totalTorqueRelPlane = np.zeros(len(posPrimx[i]))
+
+	for j in range(0, len(posPrimx[i]) ) :
+		gravTorquePrim[:,j] = np.cross(posPrim[:,j],gravForcePrim[:,j])
+		gravTorqueComp[:,j] = np.cross(posComp[:,j],gravForceComp[:,j])
+		hydroTorque[:,j] = np.cross(posComp[:,j],hydroForce[:,j])
+		totalTorque[:,j] = gravTorquePrim[:,j] + gravTorqueComp[:,j] + hydroTorque[:,j]
+
+		gravTorquePrimCMDM[:,j] = np.cross(posPrim[:,j]-posCMDM[:,j],gravForcePrim[:,j])
+		gravTorqueCompCMDM[:,j] = np.cross(posComp[:,j]-posCMDM[:,j],gravForceComp[:,j])
+		hydroTorqueCMDM[:,j] = np.cross(posComp[:,j]-posCMDM[:,j],hydroForce[:,j])
+		totalTorqueCMDM[:,j] = gravTorquePrimCMDM[:,j] + gravTorqueCompCMDM[:,j] + hydroTorqueCMDM[:,j]
+
+		gravTorquePrimCMDMaccel[:,j] = np.cross(posPrim[:,j]-posCMDM[:,j],gravForcePrim[:,j]-mPrim[i][j]*accelCMDM[:,j])
+		gravTorqueCompCMDMaccel[:,j] = np.cross(posComp[:,j]-posCMDM[:,j],gravForceComp[:,j]-mComp[i][j]*accelCMDM[:,j])
+		hydroTorqueCMDMaccel[:,j] = np.cross(posComp[:,j]-posCMDM[:,j],hydroForce[:,j])
+		totalTorqueCMDMaccel[:,j] = gravTorquePrimCMDMaccel[:,j] + gravTorqueCompCMDMaccel[:,j] + hydroTorqueCMDMaccel[:,j]
+
+		gravTorqueRel[:,j] = np.cross(posComp[:,j]-posPrim[:,j],gravForceComp[:,j])
+		hydroTorqueRel[:,j] = np.cross(posComp[:,j]-posPrim[:,j],hydroForce[:,j])
+		totalTorqueRel[:,j] = gravTorqueRel[:,j] + hydroTorqueRel[:,j]
+
+		vRel = vComp[:,j] - vPrim[:,j]
+		vRelUnit = vRel / np.linalg.norm(vRel)
+		rRelUnit = (posComp[:,j]-posPrim[:,j])/np.linalg.norm(posComp[:,j]-posPrim[:,j])
+		nplane = np.cross(rRelUnit,vRelUnit)
+		nplane = nplane / np.linalg.norm(nplane)
+
+		gravTorquePrimPlane[j] = -np.dot(gravTorquePrim[:,j],nplane)
+		gravTorqueCompPlane[j] = -np.dot(gravTorqueComp[:,j],nplane)
+		hydroTorquePlane[j] = -np.dot(hydroTorque[:,j],nplane)
+		totalTorquePlane[j] = -np.dot(totalTorque[:,j],nplane)
+		gravTorquePrimCMDMPlane[j] = -np.dot(gravTorquePrimCMDM[:,j],nplane)
+		gravTorqueCompCMDMPlane[j] = -np.dot(gravTorqueCompCMDM[:,j],nplane)
+		hydroTorqueCMDMPlane[j] = -np.dot(hydroTorqueCMDM[:,j],nplane)
+		totalTorqueCMDMPlane[j] = -np.dot(totalTorqueCMDM[:,j],nplane)
+		gravTorquePrimCMDMaccelPlane[j] = -np.dot(gravTorquePrimCMDMaccel[:,j],nplane)
+		gravTorqueCompCMDMaccelPlane[j] = -np.dot(gravTorqueCompCMDMaccel[:,j],nplane)
+		hydroTorqueCMDMaccelPlane[j] = -np.dot(hydroTorqueCMDMaccel[:,j],nplane)
+		totalTorqueCMDMaccelPlane[j] = -np.dot(totalTorqueCMDMaccel[:,j],nplane)
+		gravTorqueRelPlane[j] = -np.dot(gravTorqueRel[:,j],nplane)
+		hydroTorqueRelPlane[j] = -np.dot(hydroTorqueRel[:,j],nplane)
+		totalTorqueRelPlane[j] = -np.dot(totalTorqueRel[:,j],nplane)
+
+	plt.plot( time[i], hydroTorqueCMDMPlane*G, c=colors[0], lw=2, linestyle='-', label='Hydrodynamic' )
+	plt.plot( time[i], (gravTorquePrimCMDMPlane+gravTorqueCompCMDMPlane)*G, c=colors[1], lw=2, linestyle='-', label='Gravitational')
+	plt.plot( time[i], totalTorqueCMDMPlane*G, c=colors[2], lw=2, linestyle='-', label='Total (Inertial)' )
+	#plt.plot( time[i], totalTorqueCMDMaccelPlane*G, c=colors[3], lw=2, linestyle=':', label='Total (Non-Inertial)' )
+	plt.legend(prop={'size': 12})
+	plt.xlabel(r'$t~/~{\rm d}$', fontsize=25 )
+	plt.ylabel(r'${\rm Torque~/~dyn~cm}$', fontsize=25 )
+	plt.axis([0.,40.,-2.4e46,2.0e46])
 	plt.xticks( fontsize=20)
 	plt.yticks( fontsize=20)
 	plt.grid(True)
@@ -459,7 +563,23 @@ def plotTorques( time, sep, posPrimx, posPrimy, posPrimz, posCompx, posCompy, po
 	savePlot(fig,'torque.pdf')
 	plt.clf()
 
-def plotMirrorForces( time, mirrorMass, mirrorRadius, mirrorForceX, mirrorForceY, mirrorForceZ, mirrorGravX, mirrorGravY, mirrorGravZ, mirrorGravCorrX, mirrorGravCorrY, mirrorGravCorrZ, dynFric, dynFricV, dynFricNoCorr, nplots, labels ):
+	fig = plt.figure()
+	plt.plot( time[i], hydroTorqueRelPlane*G, c=colors[0], lw=2, linestyle='-', label='Hydro' )
+	plt.plot( time[i], gravTorqueRelPlane*G, c=colors[1], lw=2, linestyle='-', label='Grav')
+	plt.plot( time[i], totalTorqueRelPlane*G, c=colors[2], lw=2, linestyle='-', label='Total' )
+	plt.legend()
+	plt.xlabel(r'$t~/~{\rm d}$', fontsize=25 )
+	plt.ylabel(r'${\rm Torque~/~dyn~cm}$', fontsize=25 )
+	plt.axis([0.,40.,-6.0e46,6.0e46])
+	plt.xticks( fontsize=20)
+	plt.yticks( fontsize=20)
+	plt.grid(True)
+	plt.tight_layout()
+	savePlot(fig,'torquerel.pdf')
+	plt.clf()
+
+
+def plotMirrorForces( time, mirrorMass, mirrorRadius, mirrorForceX, mirrorForceY, mirrorForceZ, mirrorGravX, mirrorGravY, mirrorGravZ, mirrorGravCorrX, mirrorGravCorrY, mirrorGravCorrZ, dynFric, dynFricV, dynFricNoCorr, sep, nplots, labels ):
 	colors = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9476bd','#8c564b','#e377c2','#7f7f7f','#bcbd22','#17becf']
 
 	fig = plt.figure()
@@ -482,17 +602,22 @@ def plotMirrorForces( time, mirrorMass, mirrorRadius, mirrorForceX, mirrorForceY
 	savePlot(fig,'mirrorforce.pdf')
 	plt.clf()
 
-	fig = plt.figure()
-	for i in range(0,nplots):
-		plt.plot( time[i], dynFric[i]*G, c=colors[i], lw=2, linestyle='-', label=labels[i] )
-	if nplots > 1 :
-		plt.legend()
-	plt.xlabel(r'$t~/~{\rm d}$', fontsize=25 )
-	plt.ylabel('Dynamical Friction (dynes)', fontsize=25 )
-	# plt.axis([0.,40.,-5.0e34,6.0e34])
-	plt.xticks( fontsize=20)
-	plt.yticks( fontsize=20)
-	plt.grid(True)
+	fig, ax1 = plt.subplots()
+	ax1.set_xlabel(r'$t~/~{\rm d}$', fontsize=25)
+	ax1.set_ylabel(r'$F_{\rm g,drag}~/~{\rm dynes}$', fontsize=25)
+	if nplots == 1 :
+		ax1.plot( time[i], dynFric[i]*G, c=colors[1], lw=2, linestyle='-', label='Dynamical Friction' )
+		plt.xticks(fontsize=20)
+		plt.yticks(fontsize=20)
+		plt.grid(True)
+		ax2 = ax1.twinx()
+		ax2.set_ylabel(r'$r~/~{\rm R_{\odot}}$', fontsize=25)
+		ax2.plot( time[i], sep[i], c=colors[0], lw=2, label='Separation' )
+		plt.xticks(fontsize=20)
+		plt.yticks(fontsize=20)
+		#plt.legend(prop={'size':15})
+		ax2.axis([0.,40.,0.,60.])
+		ax1.axis([0.,40.,-6.0e34,5.0e34])
 	plt.tight_layout()
 	savePlot(fig,'dynfric.pdf')
 	plt.clf()
@@ -525,7 +650,7 @@ def plotMirrorForces( time, mirrorMass, mirrorRadius, mirrorForceX, mirrorForceY
 		plt.plot( time[i], mirrorForce*G, c=colors[i], lw=2, linestyle='-', label=labels[i] )
 
 		startTime = 0.
-		endTime = 40.
+		endTime = 60.
 		beforeArray = time[i] < endTime
 		afterArray = time[i] > startTime
 		boolArray = np.logical_and(beforeArray,afterArray)
@@ -666,7 +791,7 @@ def plotSmoothSep( nplots, labels, time, sep ):
 	if nplots > 1 :
 		plt.legend(prop={'size':15})
 	plt.xlabel(r'$t~/~{\rm d}$', fontsize=25 )
-	plt.ylabel(r'$a_{\rm smoothed}~/~{\rm R_{\odot}}$', fontsize=25 )
+	plt.ylabel(r'$r_{\rm smoothed}~/~{\rm R_{\odot}}$', fontsize=25 )
 	plt.axis([15.,60.,5.,30.])
 	# plt.hlines( 1.9935 + 0.99, 0., 1000. ) # paper
 	plt.yscale('log')
@@ -686,8 +811,8 @@ posCMy, posCMz, posPrimx, posPrimy, posPrimz, posCompx, posCompy, posCompz, velC
 	if nplots > 1 :
 		plt.legend(prop={'size':15})
 	plt.xlabel(r'$t~/~{\rm d}$', fontsize=25 )
-	plt.ylabel(r'$a~/~{\rm R_{\odot}}$', fontsize=25 )
-	plt.axis([15.,60.,0.,30.])
+	plt.ylabel(r'$r~/~{\rm R_{\odot}}$', fontsize=25 )
+	#plt.axis([15.,60.,0.,30.])
 	# plt.hlines( 3.75 + 11.981 , 0., 1000. ) # m70soft4 initial
 	# plt.hlines( 3.75 + 6.253 , 0., 1000. ) # massive before change?
 	# plt.hlines( 2.0 + 1.0 , 0., 1000. ) # massive after change
@@ -776,7 +901,7 @@ posCMy, posCMz, posPrimx, posPrimy, posPrimz, posCompx, posCompy, posCompz, velC
 	plt.ylabel(r'${\rm Eccentricity}$',fontsize=20)
 	plt.xticks( fontsize=20)
 	plt.yticks( fontsize=20)
-	plt.axis([15.,60.,0.23,0.52])
+	#plt.axis([15.,60.,0.23,0.52])
 	plt.grid(True)
 	plt.tight_layout()
 	savePlot(fig,'ecc.pdf')
@@ -866,7 +991,10 @@ mirrorGravCorrX, mirrorGravCorrY, mirrorGravCorrZ, dynFric, dynFricV, dynFricNoC
 mPrim, mComp, gravPrimGasX, gravPrimGasY, gravPrimGasZ = collectData(nplots,paths)
 
 if movingBC :
-	plotMirrorForces( time, mirrorMass, mirrorRadius, mirrorForceX, mirrorForceY, mirrorForceZ, mirrorGravX, mirrorGravY, mirrorGravZ, mirrorGravCorrX, mirrorGravCorrY, mirrorGravCorrZ, dynFric, dynFricV, dynFricNoCorr, nplots, labels )
+	plotMirrorForces( time, mirrorMass, mirrorRadius, mirrorForceX, mirrorForceY, mirrorForceZ, mirrorGravX, mirrorGravY, mirrorGravZ, mirrorGravCorrX, mirrorGravCorrY, mirrorGravCorrZ, dynFric, dynFricV, dynFricNoCorr, sep, nplots, labels )
+	plotL( time, posPrimx, posPrimy, posPrimz, posCompx, posCompy, posCompz, mPrim, mComp, corePx, corePy, corePz, compPx, compPy, compPz, nplots, labels )
+	if nplots == 1 :
+		plotTorques( time, sep, posPrimx, posPrimy, posPrimz, posCompx, posCompy, posCompz, mPrim, mComp, mirrorForceX, mirrorForceY, mirrorForceZ, mirrorGravX, mirrorGravY, mirrorGravZ, mirrorGravCorrX, mirrorGravCorrY, mirrorGravCorrZ, gravPrimGasX, gravPrimGasY, gravPrimGasZ, dynFric, dynFricV, dynFricNoCorr, corePx, corePy, corePz, compPx, compPy, compPz, nplots, labels )
 if args.unbound :
 	plotUnbound( time, fracunbound, ejeceff, fracunbound_noIe, ejeceff_noIe, nplots, labels )
 	plotUnbound_i( time, fracunbound_i, ejeceff_i, nplots, labels )
